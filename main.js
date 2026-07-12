@@ -222,7 +222,7 @@ async function processImage(srcPath) {
     for(const thumbType in thumbs) {
         const maxSize = thumbs[thumbType];
         let newPath = srcPath.replace(/\..+$/, '')+'-'+thumbType+'.jpg';
-        await executeCommand('magick', ['convert', srcPath, '-resize', maxSize+'<^', newPath]);
+        await executeCommand('magick', ['convert', srcPath, '-resize', `${maxSize}x${maxSize}^>`, newPath]);
         thumbs[thumbType] = newPath;
     }
     return thumbs;
