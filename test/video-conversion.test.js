@@ -1,9 +1,18 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { softwareVideoArgs, vaapiVideoArgs } = require('../video-conversion');
+const { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs } = require('../video-conversion');
 
-test('VAAPI conversion decodes in software before uploading frames', () => {
-    const args = vaapiVideoArgs('input.mov', "'-2:min(720,ih)'", 'output.mp4');
+test('full VAAPI conversion keeps decoding, scaling, and encoding in hardware', () => {
+    const args = fullVaapiVideoArgs('input.mov', "'-2:min(720,ih)'", 'output.mp4');
+
+    assert.equal(args[args.indexOf('-hwaccel') + 1], 'vaapi');
+    assert.equal(args[args.indexOf('-hwaccel_output_format') + 1], 'vaapi');
+    assert.equal(args[args.indexOf('-filter:v') + 1], "scale_vaapi='-2:min(720,ih)'");
+    assert.equal(args[args.indexOf('-c:v') + 1], 'h264_vaapi');
+});
+
+test('VAAPI encoding fallback decodes in software before uploading frames', () => {
+    const args = vaapiEncodeVideoArgs('input.mov', "'-2:min(720,ih)'", 'output.mp4');
 
     assert.equal(args.includes('-hwaccel'), false);
     assert.deepEqual(args.slice(3, 5), ['-vaapi_device', '/dev/dri/renderD128']);

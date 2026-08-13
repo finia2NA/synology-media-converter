@@ -12,7 +12,7 @@ const {
     withRetry
 } = require('./http-retry');
 const { uploadFiles } = require('./upload-files');
-const { softwareVideoArgs, vaapiVideoArgs } = require('./video-conversion');
+const { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs } = require('./video-conversion');
 const config = require('./config.json');
 
 async function login(account) {
@@ -173,15 +173,25 @@ async function processVideo(srcPath, needThumbnails, needVideo) {
             let convertedWithVaapi = false;
             if(process.env.USE_VAAPI == 'true') {
                 try {
-                    // Some common camera formats (for example HEVC 10-bit 4:2:2)
-                    // cannot be decoded by older VAAPI devices. Decode and apply
-                    // autorotation in software, then upload frames for accelerated
-                    // scaling and H.264 encoding.
-                    await executeCommand('ffmpeg', vaapiVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
+                    await executeCommand('ffmpeg', fullVaapiVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
                     convertedWithVaapi = true;
                 } catch(err) {
-                    console.warn('VAAPI conversion failed; retrying with software encoding:', err.message);
+                    console.warn('Full VAAPI conversion failed; retrying with software decoding:', err.message);
                     await fs.promises.rm(newPath, { force: true });
+                }
+
+                if(!convertedWithVaapi) {
+                    try {
+                        // Some common camera formats (for example HEVC 10-bit 4:2:2)
+                        // cannot be decoded by older VAAPI devices. Decode and apply
+                        // autorotation in software, then upload frames for accelerated
+                        // scaling and H.264 encoding.
+                        await executeCommand('ffmpeg', vaapiEncodeVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
+                        convertedWithVaapi = true;
+                    } catch(err) {
+                        console.warn('VAAPI encoding failed; retrying with software encoding:', err.message);
+                        await fs.promises.rm(newPath, { force: true });
+                    }
                 }
             }
             if(!convertedWithVaapi) {
