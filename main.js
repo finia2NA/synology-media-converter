@@ -12,6 +12,7 @@ const {
     withRetry
 } = require('./http-retry');
 const { uploadFiles } = require('./upload-files');
+const { softwareVideoArgs, vaapiVideoArgs } = require('./video-conversion');
 const config = require('./config.json');
 
 async function login(account) {
@@ -169,10 +170,22 @@ async function processVideo(srcPath, needThumbnails, needVideo) {
             await executeCommand('ffmpeg', ['-v', 'error', '-y', '-i', srcPath, '-filter:v', 'thumbnail,scale='+scale, '-frames:v', '1', newPath]);
         } else {
             newPath += '.mp4';
+            let convertedWithVaapi = false;
             if(process.env.USE_VAAPI == 'true') {
-                await executeCommand('ffmpeg', ['-v', 'error', '-y', '-hwaccel', 'vaapi', '-hwaccel_output_format', 'vaapi', '-i', srcPath, '-filter:v', 'scale_vaapi='+scale, '-c:v', 'h264_vaapi', '-preset', 'slow', newPath]);
-            } else {
-                await executeCommand('ffmpeg', ['-v', 'error', '-y', '-i', srcPath, '-filter:v', 'scale='+scale, '-c:v', 'h264', '-preset', 'slow', newPath]);
+                try {
+                    // Some common camera formats (for example HEVC 10-bit 4:2:2)
+                    // cannot be decoded by older VAAPI devices. Decode and apply
+                    // autorotation in software, then upload frames for accelerated
+                    // scaling and H.264 encoding.
+                    await executeCommand('ffmpeg', vaapiVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
+                    convertedWithVaapi = true;
+                } catch(err) {
+                    console.warn('VAAPI conversion failed; retrying with software encoding:', err.message);
+                    await fs.promises.rm(newPath, { force: true });
+                }
+            }
+            if(!convertedWithVaapi) {
+                await executeCommand('ffmpeg', softwareVideoArgs(srcPath, scale, newPath));
             }
         }
         thumbs[thumbType] = newPath;

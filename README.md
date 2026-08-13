@@ -50,11 +50,12 @@ Example config for 2 users on the same device:
 | SINGLE_RUN | Only run the script once instead of using cron. Auto restart of the container must be disabled. | false |
 | EXIT_ON_FAIL | Exit on conversion errors instead of permanently marking the affected file as broken. Usually only used for testing purposes. | false |
 | USE_VAAPI | Enable hardware acceleration via VAAPI. For more info see [Hardware Acceleration](#hardware-acceleration). | false |
+| VAAPI_DEVICE | VAAPI render device used for accelerated scaling and H.264 encoding. | `/dev/dri/renderD128` |
 | API_TIMEOUT_MS | Timeout for login and API requests in milliseconds. | `30000` |
 | TRANSFER_TIMEOUT_MS | Timeout for each media download or upload attempt in milliseconds. | `1800000` |
 | HTTP_RETRIES | Number of retries after a transient HTTP or network failure. | `3` |
 | RETRY_BASE_DELAY_MS | Initial retry backoff in milliseconds. Each retry doubles it before jitter. | `1000` |
 | RETRY_MAX_DELAY_MS | Maximum retry backoff in milliseconds. | `30000` |
 
-## Hardare Acceleration
-Hardware transcoding to x264 is currently supported on Intel and AMD Graphics using VAAPI, which is what's available on most DiskStation models. To enable hardware acceleration add the environment variable `USE_VAAPI=true` and pass through the VAAPI device via `--device /dev/dri/renderD128`. The right permissions will be set automatically on startup.
+## Hardware Acceleration
+Hardware transcoding to x264 is currently supported on Intel and AMD Graphics using VAAPI, which is what's available on most DiskStation models. To enable hardware acceleration add the environment variable `USE_VAAPI=true` and pass through the VAAPI device via `--device /dev/dri/renderD128`. Decoding and autorotation happen in software so camera formats unsupported by the GPU can still use accelerated scaling and encoding. If VAAPI conversion fails, the app retries that video with software encoding. The right permissions will be set automatically on startup.
