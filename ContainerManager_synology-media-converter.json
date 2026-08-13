@@ -17,10 +17,6 @@
          "value" : "true"
       },
       {
-         "key" : "VAAPI_DEVICE",
-         "value" : "/dev/dri/renderD128"
-      },
-      {
          "key" : "API_TIMEOUT_MS",
          "value" : "30000"
       },

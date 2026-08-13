@@ -2,10 +2,10 @@ function softwareVideoArgs(srcPath, scale, destinationPath) {
     return ['-v', 'error', '-y', '-i', srcPath, '-filter:v', 'scale='+scale, '-c:v', 'h264', '-preset', 'slow', destinationPath];
 }
 
-function fullVaapiVideoArgs(srcPath, scale, destinationPath, device = '/dev/dri/renderD128') {
+function fullVaapiVideoArgs(srcPath, scale, destinationPath) {
     return [
         '-v', 'error', '-y',
-        '-vaapi_device', device,
+        '-vaapi_device', '/dev/dri/renderD128',
         '-hwaccel', 'vaapi',
         '-hwaccel_output_format', 'vaapi',
         '-i', srcPath,
@@ -16,10 +16,10 @@ function fullVaapiVideoArgs(srcPath, scale, destinationPath, device = '/dev/dri/
     ];
 }
 
-function vaapiEncodeVideoArgs(srcPath, scale, destinationPath, device = '/dev/dri/renderD128') {
+function vaapiEncodeVideoArgs(srcPath, scale, destinationPath) {
     return [
         '-v', 'error', '-y',
-        '-vaapi_device', device,
+        '-vaapi_device', '/dev/dri/renderD128',
         '-i', srcPath,
         '-filter:v', 'format=nv12,hwupload,scale_vaapi='+scale,
         '-c:v', 'h264_vaapi',

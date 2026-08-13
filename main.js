@@ -173,7 +173,7 @@ async function processVideo(srcPath, needThumbnails, needVideo) {
             let convertedWithVaapi = false;
             if(process.env.USE_VAAPI == 'true') {
                 try {
-                    await executeCommand('ffmpeg', fullVaapiVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
+                    await executeCommand('ffmpeg', fullVaapiVideoArgs(srcPath, scale, newPath));
                     convertedWithVaapi = true;
                 } catch(err) {
                     console.warn('Full VAAPI conversion failed; retrying with software decoding:', err.message);
@@ -186,7 +186,7 @@ async function processVideo(srcPath, needThumbnails, needVideo) {
                         // cannot be decoded by older VAAPI devices. Decode and apply
                         // autorotation in software, then upload frames for accelerated
                         // scaling and H.264 encoding.
-                        await executeCommand('ffmpeg', vaapiEncodeVideoArgs(srcPath, scale, newPath, process.env.VAAPI_DEVICE));
+                        await executeCommand('ffmpeg', vaapiEncodeVideoArgs(srcPath, scale, newPath));
                         convertedWithVaapi = true;
                     } catch(err) {
                         console.warn('VAAPI encoding failed; retrying with software encoding:', err.message);
