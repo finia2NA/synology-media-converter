@@ -4,6 +4,7 @@ const { Readable } = require('stream');
 const { finished } = require('stream/promises');
 const childProcess = require('child_process');
 const axios = require('axios');
+const { acquireInstanceLock } = require('./instance-lock');
 const config = require('./config.json');
 
 async function login(account) {
@@ -249,6 +250,12 @@ function readLine(prompt) {
 
 
 (async () => {
+    const instanceLock = await acquireInstanceLock();
+    if(!instanceLock) {
+        console.log('Another converter instance is already running, exiting');
+        return;
+    }
+
     if(!fs.existsSync('tmp')) {
         fs.mkdirSync('tmp');
     }
