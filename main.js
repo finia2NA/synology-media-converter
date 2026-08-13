@@ -3,13 +3,20 @@ const readline = require('readline');
 const { Readable } = require('stream');
 const { finished } = require('stream/promises');
 const childProcess = require('child_process');
-const axios = require('axios');
 const { acquireInstanceLock } = require('./instance-lock');
+const {
+    SynologyApiError,
+    fetchJsonWithRetry,
+    fetchResponse,
+    httpSettings,
+    withRetry
+} = require('./http-retry');
+const { uploadFiles } = require('./upload-files');
 const config = require('./config.json');
 
 async function login(account) {
     const session = { url: account.url };
-    let res = await fetch(account.url+'/webapi/entry.cgi', {
+    const res = await fetchJsonWithRetry(account.url+'/webapi/entry.cgi', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -27,14 +34,13 @@ async function login(account) {
             passwd: account.password,
             otp_code: account.otpCode || ''
         })
-    });
-    res = await res.json();
+    }, 'Login');
     if(!res.success) {
         if(res.error.code == 403) {
             session.requireOtp = true;
             return session;
         } else {
-            throw new Error('Authentication failed with error '+JSON.stringify(res.error));
+            throw new SynologyApiError('Authentication failed', res.error);
         }
     }
 
@@ -45,7 +51,7 @@ async function login(account) {
 }
 
 async function checkConversionNeeded(session) {
-    let res = await fetch(session.url+'/webapi/entry.cgi', {
+    const res = await fetchJsonWithRetry(session.url+'/webapi/entry.cgi', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -59,75 +65,35 @@ async function checkConversionNeeded(session) {
             type: '["photo","video","live_video"]',
             preset: 'windows'
         })
-    });
-    res = await res.json();
-    if(!res.success) throw new Error('Requesting conversion needed failed with error '+JSON.stringify(res.error));
+    }, 'Conversion list request');
+    if(!res.success) throw new SynologyApiError('Requesting conversion needed failed', res.error);
     return res.data.list;
 }
 
 async function downloadFile(session, unitId, savePath) {
-    let res = await fetch(session.url+'/webapi/entry.cgi?'+new URLSearchParams({
-        api: 'SYNO.Foto.Download',
-        version: 1,
-        method: 'download',
-        unit_id: '['+unitId+']'
-    }), {
-        headers: {
-            'X-Syno-Token': session.synoToken,
-            'Cookie': `did=${session.did}; id=${session.sid}`
+    await withRetry(async () => {
+        await fs.promises.rm(savePath, { force: true });
+        const res = await fetchResponse(session.url+'/webapi/entry.cgi?'+new URLSearchParams({
+            api: 'SYNO.Foto.Download',
+            version: 1,
+            method: 'download',
+            unit_id: '['+unitId+']'
+        }), {
+            headers: {
+                'X-Syno-Token': session.synoToken,
+                'Cookie': `did=${session.did}; id=${session.sid}`
+            }
+        }, httpSettings.transferTimeoutMs);
+        if(res.headers.get('content-type')?.includes('json')) {
+            const data = await res.json();
+            if(!data.success) {
+                throw new SynologyApiError(`Download of file ${unitId} failed`, data.error);
+            }
+            return;
         }
-    });
-    if(res.headers.get("content-type").includes('json')) {
-        res = await res.json();
-        if(!res.success) throw new Error(`Download of file ${unitId} failed with error `+JSON.stringify(res.error));
-    } else {
         const fileStream = fs.createWriteStream(savePath, { flags: 'w' });
         await finished(Readable.fromWeb(res.body).pipe(fileStream));
-    }
-}
-
-/*async function uploadFiles(session, unitId, filePaths) {
-    // Upload fails due to bug in Fetch API or built in FormData
-    const form = new FormData();
-    form.set('api', 'SYNO.Foto.Upload.ConvertedFile');
-    form.set('version', '3');
-    form.set('method', 'upload');
-    form.set('unit_id', unitId);
-    for(const name in filePaths) {
-        const path = filePaths[name];
-        form.set(name, fs.createReadStream(path));
-    }
-
-    let res = await fetch(session.url+'/webapi/entry.cgi', {
-        method: 'POST',
-        headers: {
-            'X-Syno-Token': session.synoToken,
-            'Cookie': `did=${session.did}; id=${session.sid}`
-        },
-        body: form
-    });
-    res = await res.json();
-    console.log(res)
-    if(!res.success) throw new Error(`Upload of file ${unitId} failed with error `+JSON.stringify(res.error));
-}*/
-async function uploadFiles(session, unitId, filePaths) {
-    const form = {
-        api: 'SYNO.Foto.Upload.ConvertedFile',
-        version: 3,
-        method: 'upload',
-        unit_id: unitId
-    };
-    for(const name in filePaths) {
-        const path = filePaths[name];
-        form[name] = fs.createReadStream(path);
-    }
-    const res = await axios.postForm(session.url+'/webapi/entry.cgi', form, {
-        headers: {
-            'X-Syno-Token': session.synoToken,
-            'Cookie': `did=${session.did}; id=${session.sid}`
-        }
-    });
-    if(!res.data.success) throw new Error(`Upload of file ${unitId} failed with error `+JSON.stringify(res.data.error));
+    }, { label: `Download of file ${unitId}` });
 }
 
 async function setBroken(session, unitId) {
@@ -135,7 +101,7 @@ async function setBroken(session, unitId) {
         throw new Error('Exit on broken file is enabled.');
     }
 
-    let res = await fetch(session.url+'/webapi/entry.cgi?'+new URLSearchParams({
+    const res = await fetchJsonWithRetry(session.url+'/webapi/entry.cgi?'+new URLSearchParams({
         api: 'SYNO.Foto.Upload.ConvertedFile',
         version: 3,
         method: 'set_broken',
@@ -146,9 +112,10 @@ async function setBroken(session, unitId) {
             'X-Syno-Token': session.synoToken,
             'Cookie': `did=${session.did}; id=${session.sid}`
         }
-    });
-    res = await res.json();
-    if(!res.success) throw new Error(`Marking file ${unitId} as broken failed with error `+JSON.stringify(res.error));
+    }, `Marking file ${unitId} as broken`);
+    if(!res.success) {
+        throw new SynologyApiError(`Marking file ${unitId} as broken failed`, res.error);
+    }
 }
 
 function executeCommand(cmd, args) {
