@@ -15,11 +15,11 @@ You can easily install the service via the [Container manager](https://www.synol
 docker run -d --name=synology-media-converter \
     --network=host \
     -v <config_file>:/app/config.json \
-    -e TZ=<timezone>
+    -e TZ=<timezone> \
     -e CRON_INTERVAL="0 1 * * *" \
     -e USE_VAAPI=true \
     --device /dev/dri/renderD128 \
-    ghcr.io/1randomdev/synology-media-converter
+    ghcr.io/finia2na/synology-media-converter:latest
 ```
 
 ## Configuration

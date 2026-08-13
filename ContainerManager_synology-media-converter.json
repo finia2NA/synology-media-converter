@@ -43,7 +43,7 @@
    ],
    "exporting" : false,
    "id" : "51653f6b3a8b6c4b7008d0f122ceff049e6b156db0b1a9dfca7024fc5a2edd23",
-   "image" : "ghcr.io/1randomdev/synology-media-converter:latest",
+   "image" : "ghcr.io/finia2na/synology-media-converter:latest",
    "is_ddsm" : false,
    "is_package" : false,
    "links" : [],

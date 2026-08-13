@@ -2,12 +2,23 @@ name: Docker Build
 
 on:
   push:
+    branches:
+      - master
+      - codex/prevent-concurrent-runs
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
-permissions: 
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
   contents: read
   packages: write
+
+env:
+  REGISTRY_IMAGE: ghcr.io/finia2na/synology-media-converter
 
 jobs:
   build-docker-image:
@@ -34,11 +45,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/1randomdev/synology-media-converter
+          images: ${{ env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=edge,enable=${{ github.ref_type == 'branch' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
             type=ref,event=tag
+            type=sha,prefix=sha-
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -48,3 +60,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
