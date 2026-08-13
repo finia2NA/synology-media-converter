@@ -56,5 +56,11 @@ Example config for 2 users on the same device:
 | RETRY_BASE_DELAY_MS | Initial retry backoff in milliseconds. Each retry doubles it before jitter. | `1000` |
 | RETRY_MAX_DELAY_MS | Maximum retry backoff in milliseconds. | `30000` |
 
+## Single-instance execution
+
+The converter prevents overlapping runs by holding an abstract Unix socket on Linux. This is the path used on Synology and in the Docker image, and the kernel automatically releases the lock when the process exits or crashes.
+
+When running the Node.js process directly on a non-Linux development system (eg. macOS), the lock falls back to a filesystem socket named `synology-media-converter.sock` in the operating system's temporary directory. An abnormal termination may leave that socket behind. If the converter reports that another instance is running when none is active, remove the stale socket from the temporary directory before restarting it.
+
 ## Hardware Acceleration
 Hardware transcoding to x264 is currently supported on Intel and AMD Graphics using VAAPI, which is what's available on most DiskStation models. To enable hardware acceleration add the environment variable `USE_VAAPI=true` and pass through the VAAPI device via `--device /dev/dri/renderD128`. The app first attempts fully accelerated decoding, scaling, and encoding. If the device cannot decode the source format, it retries with software decoding and accelerated scaling and encoding. If VAAPI still fails, it retries with fully software conversion. The right permissions will be set automatically on startup.

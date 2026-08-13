@@ -1,15 +1,11 @@
 const fs = require('fs');
 const readline = require('readline');
-const { Readable } = require('stream');
-const { finished } = require('stream/promises');
 const childProcess = require('child_process');
+const { downloadFile } = require('./download-file');
 const { acquireInstanceLock } = require('./instance-lock');
 const {
     SynologyApiError,
-    fetchJsonWithRetry,
-    fetchResponse,
-    httpSettings,
-    withRetry
+    fetchJsonWithRetry
 } = require('./http-retry');
 const { uploadFiles } = require('./upload-files');
 const { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs } = require('./video-conversion');
@@ -69,32 +65,6 @@ async function checkConversionNeeded(session) {
     }, 'Conversion list request');
     if(!res.success) throw new SynologyApiError('Requesting conversion needed failed', res.error);
     return res.data.list;
-}
-
-async function downloadFile(session, unitId, savePath) {
-    await withRetry(async () => {
-        await fs.promises.rm(savePath, { force: true });
-        const res = await fetchResponse(session.url+'/webapi/entry.cgi?'+new URLSearchParams({
-            api: 'SYNO.Foto.Download',
-            version: 1,
-            method: 'download',
-            unit_id: '['+unitId+']'
-        }), {
-            headers: {
-                'X-Syno-Token': session.synoToken,
-                'Cookie': `did=${session.did}; id=${session.sid}`
-            }
-        }, httpSettings.transferTimeoutMs);
-        if(res.headers.get('content-type')?.includes('json')) {
-            const data = await res.json();
-            if(!data.success) {
-                throw new SynologyApiError(`Download of file ${unitId} failed`, data.error);
-            }
-            return;
-        }
-        const fileStream = fs.createWriteStream(savePath, { flags: 'w' });
-        await finished(Readable.fromWeb(res.body).pipe(fileStream));
-    }, { label: `Download of file ${unitId}` });
 }
 
 async function setBroken(session, unitId) {
