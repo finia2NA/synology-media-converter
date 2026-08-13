@@ -19,7 +19,7 @@ docker run -d --name=synology-media-converter \
     -e CRON_INTERVAL="0 1 * * *" \
     -e USE_VAAPI=true \
     --device /dev/dri/renderD128 \
-    ghcr.io/finia2na/synology-media-converter:latest
+    ghcr.io/1randomdev/synology-media-converter:latest
 ```
 
 ## Configuration
