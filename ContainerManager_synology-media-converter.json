@@ -17,6 +17,10 @@
          "value" : "true"
       },
       {
+         "key" : "VIDEO_THUMBNAIL_STRATEGY",
+         "value" : "best"
+      },
+      {
          "key" : "API_TIMEOUT_MS",
          "value" : "30000"
       },

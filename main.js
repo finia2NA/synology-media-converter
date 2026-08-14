@@ -16,7 +16,7 @@ const {
 } = require('./video-conversion');
 const config = require('./config.json');
 
-const videoThumbnailStrategy = config.videoThumbnailStrategy ?? 'best';
+const videoThumbnailStrategy = process.env.VIDEO_THUMBNAIL_STRATEGY ?? config.videoThumbnailStrategy ?? 'best';
 if(!['best', 'fast'].includes(videoThumbnailStrategy)) {
     throw new Error(`Invalid videoThumbnailStrategy "${videoThumbnailStrategy}"; expected "best" or "fast".`);
 }
