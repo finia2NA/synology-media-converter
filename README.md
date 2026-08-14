@@ -18,6 +18,7 @@ docker run -d --name=synology-media-converter \
     -e TZ=<timezone> \
     -e CRON_INTERVAL="0 1 * * *" \
     -e USE_VAAPI=true \
+    -e VIDEO_THUMBNAIL_STRATEGY=best \
     --device /dev/dri/renderD128 \
     ghcr.io/1randomdev/synology-media-converter:latest
 ```
@@ -26,7 +27,6 @@ docker run -d --name=synology-media-converter \
 Example config for 2 users on the same device:
 ```json
 {
-    "videoThumbnailStrategy": "fast",
     "accounts": [
         {
             "url": "http://192.168.1.10:5000",
@@ -42,8 +42,6 @@ Example config for 2 users on the same device:
 }
 ```
 
-`videoThumbnailStrategy` controls how video thumbnails are selected. The default, `best`, uses FFmpeg's `thumbnail` filter to choose a representative frame. `fast` extracts the first frame once and derives every requested thumbnail size from it, which is faster and uses substantially less memory for high-resolution videos.
-
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -53,7 +51,7 @@ Example config for 2 users on the same device:
 | SINGLE_RUN | Only run the script once instead of using cron. Auto restart of the container must be disabled. | false |
 | EXIT_ON_FAIL | Exit on conversion errors instead of permanently marking the affected file as broken. Usually only used for testing purposes. | false |
 | USE_VAAPI | Enable hardware acceleration via VAAPI. For more info see [Hardware Acceleration](#hardware-acceleration). | false |
-| VIDEO_THUMBNAIL_STRATEGY | Override `videoThumbnailStrategy` from `config.json`. Accepts `best` or `fast`. | `best` |
+| VIDEO_THUMBNAIL_STRATEGY | Video thumbnail selection strategy. `best` uses FFmpeg's representative-frame filter; `fast` extracts the first frame once and derives every requested size from it, substantially reducing memory use for high-resolution videos. | `best` |
 | API_TIMEOUT_MS | Timeout for login and API requests in milliseconds. | `30000` |
 | TRANSFER_TIMEOUT_MS | Timeout for each media download or upload attempt in milliseconds. | `1800000` |
 | HTTP_RETRIES | Number of retries after a transient HTTP or network failure. | `3` |

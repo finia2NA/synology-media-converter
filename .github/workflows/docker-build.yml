@@ -2,8 +2,11 @@ name: Docker Build
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,9 +38,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/1randomdev/synology-media-converter
+            ghcr.io/finia2na/synology-media-converter
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=ref,event=tag
 
       - name: Build and push
