@@ -8,8 +8,18 @@ const {
     fetchJsonWithRetry
 } = require('./http-retry');
 const { uploadFiles } = require('./upload-files');
-const { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs } = require('./video-conversion');
+const {
+    fastVideoThumbnailArgs,
+    fullVaapiVideoArgs,
+    softwareVideoArgs,
+    vaapiEncodeVideoArgs
+} = require('./video-conversion');
 const config = require('./config.json');
+
+const videoThumbnailStrategy = config.videoThumbnailStrategy ?? 'best';
+if(!['best', 'fast'].includes(videoThumbnailStrategy)) {
+    throw new Error(`Invalid videoThumbnailStrategy "${videoThumbnailStrategy}"; expected "best" or "fast".`);
+}
 
 async function login(account) {
     const session = { url: account.url };
@@ -130,45 +140,59 @@ async function processVideo(srcPath, needThumbnails, needVideo) {
         thumbs['thumb_m'] = 320;
         thumbs['thumb_xl'] = 1280;
     }
-    for(const thumbType in thumbs) {
-        const maxSize = thumbs[thumbType];
-        const scale = landscape ? `'-2:min(${maxSize},ih)'` : `'min(${maxSize},iw):-2'`;
-        let newPath = srcPath.replace(/\..+$/, '')+'-'+thumbType;
-        
-        if(thumbType != 'film_h264') {
-            newPath += '.jpg';
-            await executeCommand('ffmpeg', ['-v', 'error', '-y', '-i', srcPath, '-filter:v', 'thumbnail,scale='+scale, '-frames:v', '1', newPath]);
-        } else {
-            newPath += '.mp4';
-            let convertedWithVaapi = false;
-            if(process.env.USE_VAAPI == 'true') {
-                try {
-                    await executeCommand('ffmpeg', fullVaapiVideoArgs(srcPath, scale, newPath));
-                    convertedWithVaapi = true;
-                } catch(err) {
-                    console.warn('Full VAAPI conversion failed; retrying with software decoding:', err.message);
-                    await fs.promises.rm(newPath, { force: true });
-                }
+    const fastThumbnailPath = srcPath.replace(/\..+$/, '')+'-thumbnail-source.jpg';
+    let fastThumbnailCreated = false;
+    try {
+        for(const thumbType in thumbs) {
+            const maxSize = thumbs[thumbType];
+            const scale = landscape ? `'-2:min(${maxSize},ih)'` : `'min(${maxSize},iw):-2'`;
+            let newPath = srcPath.replace(/\..+$/, '')+'-'+thumbType;
 
-                if(!convertedWithVaapi) {
+            if(thumbType != 'film_h264') {
+                newPath += '.jpg';
+                if(videoThumbnailStrategy == 'fast') {
+                    if(!fastThumbnailCreated) {
+                        await executeCommand('ffmpeg', fastVideoThumbnailArgs(srcPath, fastThumbnailPath));
+                        fastThumbnailCreated = true;
+                    }
+                    await executeCommand('magick', ['convert', fastThumbnailPath, '-resize', `${maxSize}x${maxSize}^>`, newPath]);
+                } else {
+                    await executeCommand('ffmpeg', ['-v', 'error', '-y', '-i', srcPath, '-filter:v', 'thumbnail,scale='+scale, '-frames:v', '1', newPath]);
+                }
+            } else {
+                newPath += '.mp4';
+                let convertedWithVaapi = false;
+                if(process.env.USE_VAAPI == 'true') {
                     try {
-                        // Some common camera formats (for example HEVC 10-bit 4:2:2)
-                        // cannot be decoded by older VAAPI devices. Decode and apply
-                        // autorotation in software, then upload frames for accelerated
-                        // scaling and H.264 encoding.
-                        await executeCommand('ffmpeg', vaapiEncodeVideoArgs(srcPath, scale, newPath));
+                        await executeCommand('ffmpeg', fullVaapiVideoArgs(srcPath, scale, newPath));
                         convertedWithVaapi = true;
                     } catch(err) {
-                        console.warn('VAAPI encoding failed; retrying with software encoding:', err.message);
+                        console.warn('Full VAAPI conversion failed; retrying with software decoding:', err.message);
                         await fs.promises.rm(newPath, { force: true });
                     }
+
+                    if(!convertedWithVaapi) {
+                        try {
+                            // Some common camera formats (for example HEVC 10-bit 4:2:2)
+                            // cannot be decoded by older VAAPI devices. Decode and apply
+                            // autorotation in software, then upload frames for accelerated
+                            // scaling and H.264 encoding.
+                            await executeCommand('ffmpeg', vaapiEncodeVideoArgs(srcPath, scale, newPath));
+                            convertedWithVaapi = true;
+                        } catch(err) {
+                            console.warn('VAAPI encoding failed; retrying with software encoding:', err.message);
+                            await fs.promises.rm(newPath, { force: true });
+                        }
+                    }
+                }
+                if(!convertedWithVaapi) {
+                    await executeCommand('ffmpeg', softwareVideoArgs(srcPath, scale, newPath));
                 }
             }
-            if(!convertedWithVaapi) {
-                await executeCommand('ffmpeg', softwareVideoArgs(srcPath, scale, newPath));
-            }
+            thumbs[thumbType] = newPath;
         }
-        thumbs[thumbType] = newPath;
+    } finally {
+        await fs.promises.rm(fastThumbnailPath, { force: true });
     }
     return thumbs;
 }

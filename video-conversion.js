@@ -28,4 +28,13 @@ function vaapiEncodeVideoArgs(srcPath, scale, destinationPath) {
     ];
 }
 
-module.exports = { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs };
+function fastVideoThumbnailArgs(srcPath, destinationPath) {
+    return ['-v', 'error', '-y', '-i', srcPath, '-frames:v', '1', destinationPath];
+}
+
+module.exports = {
+    fastVideoThumbnailArgs,
+    fullVaapiVideoArgs,
+    softwareVideoArgs,
+    vaapiEncodeVideoArgs
+};

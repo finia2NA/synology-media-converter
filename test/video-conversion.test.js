@@ -1,6 +1,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { fullVaapiVideoArgs, softwareVideoArgs, vaapiEncodeVideoArgs } = require('../video-conversion');
+const {
+    fastVideoThumbnailArgs,
+    fullVaapiVideoArgs,
+    softwareVideoArgs,
+    vaapiEncodeVideoArgs
+} = require('../video-conversion');
 
 test('full VAAPI conversion keeps decoding, scaling, and encoding in hardware', () => {
     const args = fullVaapiVideoArgs('input.mov', "'-2:min(720,ih)'", 'output.mp4');
@@ -25,4 +30,14 @@ test('software fallback uses the software scaler and H.264 encoder', () => {
 
     assert.equal(args[args.indexOf('-filter:v') + 1], "scale='-2:min(720,ih)'");
     assert.equal(args[args.indexOf('-c:v') + 1], 'h264');
+});
+
+test('fast video thumbnails decode only the first frame', () => {
+    const args = fastVideoThumbnailArgs('input.mov', 'thumbnail-source.jpg');
+
+    assert.deepEqual(args, [
+        '-v', 'error', '-y', '-i', 'input.mov',
+        '-frames:v', '1', 'thumbnail-source.jpg'
+    ]);
+    assert.equal(args.includes('-filter:v'), false);
 });

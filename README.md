@@ -26,6 +26,7 @@ docker run -d --name=synology-media-converter \
 Example config for 2 users on the same device:
 ```json
 {
+    "videoThumbnailStrategy": "fast",
     "accounts": [
         {
             "url": "http://192.168.1.10:5000",
@@ -40,6 +41,8 @@ Example config for 2 users on the same device:
     ]
 }
 ```
+
+`videoThumbnailStrategy` controls how video thumbnails are selected. The default, `best`, uses FFmpeg's `thumbnail` filter to choose a representative frame. `fast` extracts the first frame once and derives every requested thumbnail size from it, which is faster and uses substantially less memory for high-resolution videos.
 
 ## Environment Variables
 
